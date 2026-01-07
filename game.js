@@ -2,20 +2,20 @@
 const GAME_DATA = {
     traits: {
         ogen: {
-            A: { name: 'Dag zien', image: 'Ogen 1 dag 1.jpg', variant: 1 },
-            B: { name: 'Nacht zien', image: 'Ogen 3 nacht 1.jpg', variant: 2 }
+            A: { name: 'Dag zien', image: 'Ogen 1 dag 1.png', variant: 1 },
+            B: { name: 'Nacht zien', image: 'Ogen 3 nacht 1.png', variant: 2 }
         },
         poten: {
-            C: { name: 'Vliegen', image: 'Poten 1 vliegen 1.jpg', variant: 1 },
-            D: { name: 'Zwemmen', image: 'Poten 3 zwemmen 1.jpg', variant: 2 }
+            C: { name: 'Vliegen', image: 'Poten 1 vliegen 1.png', variant: 1 },
+            D: { name: 'Zwemmen', image: 'Poten 3 zwemmen 1.png', variant: 2 }
         },
         lijf: {
-            E: { name: 'Hard pantser', image: 'Lijf 1 hard koudbloedig 1.jpg', variant: 1 },
-            F: { name: 'Zachte vacht', image: 'Lijf 3 zacht warmbloedig 1.jpg', variant: 2 }
+            E: { name: 'Hard pantser', image: 'Lijf 1 hard koudbloedig 1.png', variant: 1 },
+            F: { name: 'Zachte vacht', image: 'Lijf 3 zacht warmbloedig 1.png', variant: 2 }
         },
         voedsel: {
-            G: { name: 'Vlees/insecten', image: 'Dieet 3 vlees 1.jpg', variant: 1 },
-            H: { name: 'Planten', image: 'Dieet 1 planten 1.jpg', variant: 2 }
+            G: { name: 'Vlees/insecten', image: 'Dieet 3 vlees 1.png', variant: 1 },
+            H: { name: 'Planten', image: 'Dieet 1 planten 1.png', variant: 2 }
         }
     },
     environments: [
