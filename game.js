@@ -2,20 +2,20 @@
 const GAME_DATA = {
     traits: {
         ogen: {
-            A: { name: 'Dag zien', image: 'Ogen 1 dag 1.png', variant: 1 },
-            B: { name: 'Nacht zien', image: 'Ogen 3 nacht 1.png', variant: 2 }
+            A: { name: 'Dag zien', images: ['Ogen 1 dag 1.png', 'Ogen 2 dag 2.png'] },
+            B: { name: 'Nacht zien', images: ['Ogen 3 nacht 1.png', 'Ogen 4 nacht 2.png'] }
         },
         poten: {
-            C: { name: 'Vliegen', image: 'Poten 1 vliegen 1.png', variant: 1 },
-            D: { name: 'Zwemmen', image: 'Poten 3 zwemmen 1.png', variant: 2 }
+            C: { name: 'Vliegen', images: ['Poten 1 vliegen 1.png', 'Poten 2 vliegen 2.png'] },
+            D: { name: 'Zwemmen', images: ['Poten 3 zwemmen 1.png', 'Poten 4 zwemmen 2.png'] }
         },
         lijf: {
-            E: { name: 'Hard pantser', image: 'Lijf 1 hard koudbloedig 1.png', variant: 1 },
-            F: { name: 'Zachte vacht', image: 'Lijf 3 zacht warmbloedig 1.png', variant: 2 }
+            E: { name: 'Hard pantser', images: ['Lijf 1 hard koudbloedig 1.png', 'Lijf 2 hard koudbloedig 2.png'] },
+            F: { name: 'Zachte vacht', images: ['Lijf 3 zacht warmbloedig 1.png', 'Lijf 4 zacht warmbloedig 2.png'] }
         },
         voedsel: {
-            G: { name: 'Vlees/insecten', image: 'Dieet 3 vlees 1.png', variant: 1 },
-            H: { name: 'Planten', image: 'Dieet 1 planten 1.png', variant: 2 }
+            G: { name: 'Vlees/insecten', images: ['Dieet 3 vlees 1.png', 'Dieet 4 vlees 2.png'] },
+            H: { name: 'Planten', images: ['Dieet 1 planten 1.png', 'Dieet 2 planten 2.png'] }
         }
     },
     environments: [
@@ -157,6 +157,7 @@ class AnimalCountScene extends Phaser.Scene {
                     gameState.animals.push({
                         id: i,
                         traits: { ogen: null, poten: null, lijf: null, voedsel: null },
+                        variants: { ogen: 0, poten: 0, lijf: 0, voedsel: 0 },
                         hitPoints: 2
                     });
                 }
@@ -177,7 +178,9 @@ class TraitSelectionScene extends Phaser.Scene {
         // Load all trait images
         Object.values(GAME_DATA.traits).forEach(category => {
             Object.values(category).forEach(trait => {
-                this.load.image(trait.image, 'Evolutiespel afbeeldingen transparant/' + trait.image);
+                trait.images.forEach(imageName => {
+                    this.load.image(imageName, 'Evolutiespel afbeeldingen transparant/' + imageName);
+                });
             });
         });
     }
@@ -207,45 +210,62 @@ class TraitSelectionScene extends Phaser.Scene {
             voedsel: 'VOEDSEL'
         };
 
-        const startY = 120;
-        const rowHeight = 110;
+        const startY = 140;
+        const rowHeight = 140;
 
         traitCategories.forEach((category, rowIndex) => {
             const y = startY + rowIndex * rowHeight;
 
-            this.add.text(100, y, categoryNames[category], {
-                fontSize: '24px',
+            this.add.text(width / 2, y - 60, categoryNames[category], {
+                fontSize: '28px',
                 color: '#ffffff',
                 fontFamily: 'Arial',
                 fontStyle: 'bold'
-            });
+            }).setOrigin(0.5);
 
             const traits = GAME_DATA.traits[category];
             const traitKeys = Object.keys(traits);
 
-            traitKeys.forEach((traitKey, colIndex) => {
+            // Show all 4 image variants (2 per trait type)
+            let iconIndex = 0;
+            const iconSpacing = 160;
+            const startX = width / 2 - (iconSpacing * 1.5);
+
+            traitKeys.forEach((traitKey) => {
                 const trait = traits[traitKey];
-                const x = 300 + colIndex * 250;
 
-                const button = this.add.rectangle(x, y, 200, 80,
-                    animal.traits[category] === traitKey ? 0x4CAF50 : 0x757575)
-                    .setInteractive({ useHandCursor: true });
+                trait.images.forEach((imageName, variantIndex) => {
+                    const x = startX + iconIndex * iconSpacing;
+                    const isSelected = animal.traits[category] === traitKey && animal.variants[category] === variantIndex;
 
-                this.add.text(x, y - 25, `Variant ${trait.variant}`, {
-                    fontSize: '16px',
-                    color: '#ffffff',
-                    fontFamily: 'Arial'
-                }).setOrigin(0.5);
+                    // Background for selection
+                    const bg = this.add.rectangle(x, y, 130, 100, isSelected ? 0x4CAF50 : 0x424242, isSelected ? 1 : 0.3);
+                    bg.setStrokeStyle(3, isSelected ? 0x4CAF50 : 0x666666);
+                    bg.setInteractive({ useHandCursor: true });
 
-                this.add.text(x, y + 10, trait.name, {
-                    fontSize: '14px',
-                    color: '#ffffff',
-                    fontFamily: 'Arial'
-                }).setOrigin(0.5);
+                    // Trait image
+                    const img = this.add.image(x, y, imageName);
+                    img.setDisplaySize(100, 70);
+                    img.setInteractive({ useHandCursor: true });
 
-                button.on('pointerdown', () => {
-                    animal.traits[category] = traitKey;
-                    this.showTraitSelection();
+                    // Click handler
+                    const onClick = () => {
+                        animal.traits[category] = traitKey;
+                        animal.variants[category] = variantIndex;
+                        this.showTraitSelection();
+                    };
+
+                    bg.on('pointerdown', onClick);
+                    img.on('pointerdown', onClick);
+
+                    bg.on('pointerover', () => {
+                        if (!isSelected) bg.setFillStyle(0x555555, 0.5);
+                    });
+                    bg.on('pointerout', () => {
+                        if (!isSelected) bg.setFillStyle(0x424242, 0.3);
+                    });
+
+                    iconIndex++;
                 });
             });
         });
@@ -322,22 +342,26 @@ class GamePlayScene extends Phaser.Scene {
 
             // Body (largest, centered)
             const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
-            const lijf = this.add.image(x, centerY, lijfInfo.image);
+            const lijfImage = lijfInfo.images[animal.variants.lijf];
+            const lijf = this.add.image(x, centerY, lijfImage);
             lijf.setDisplaySize(200, 140);
 
             // Legs (bottom of body)
             const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
-            const poten = this.add.image(x, centerY + 50, potenInfo.image);
+            const potenImage = potenInfo.images[animal.variants.poten];
+            const poten = this.add.image(x, centerY + 50, potenImage);
             poten.setDisplaySize(180, 100);
 
             // Eyes (top of body)
             const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
-            const ogen = this.add.image(x, centerY - 40, ogenInfo.image);
+            const ogenImage = ogenInfo.images[animal.variants.ogen];
+            const ogen = this.add.image(x, centerY - 40, ogenImage);
             ogen.setDisplaySize(140, 90);
 
             // Mouth/Food (middle-lower part of body)
             const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
-            const voedsel = this.add.image(x, centerY + 20, voedselInfo.image);
+            const voedselImage = voedselInfo.images[animal.variants.voedsel];
+            const voedsel = this.add.image(x, centerY + 20, voedselImage);
             voedsel.setDisplaySize(120, 80);
 
             // Show hit points
@@ -513,22 +537,26 @@ class ResultScene extends Phaser.Scene {
 
             // Body (largest, centered)
             const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
-            const lijf = this.add.image(x, centerY, lijfInfo.image);
+            const lijfImage = lijfInfo.images[animal.variants.lijf];
+            const lijf = this.add.image(x, centerY, lijfImage);
             lijf.setDisplaySize(160, 110);
 
             // Legs (bottom of body)
             const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
-            const poten = this.add.image(x, centerY + 40, potenInfo.image);
+            const potenImage = potenInfo.images[animal.variants.poten];
+            const poten = this.add.image(x, centerY + 40, potenImage);
             poten.setDisplaySize(140, 80);
 
             // Eyes (top of body)
             const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
-            const ogen = this.add.image(x, centerY - 30, ogenInfo.image);
+            const ogenImage = ogenInfo.images[animal.variants.ogen];
+            const ogen = this.add.image(x, centerY - 30, ogenImage);
             ogen.setDisplaySize(110, 70);
 
             // Mouth/Food (middle-lower part of body)
             const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
-            const voedsel = this.add.image(x, centerY + 15, voedselInfo.image);
+            const voedselImage = voedselInfo.images[animal.variants.voedsel];
+            const voedsel = this.add.image(x, centerY + 15, voedselImage);
             voedsel.setDisplaySize(90, 60);
 
             // Show effect
