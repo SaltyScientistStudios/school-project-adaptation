@@ -75,7 +75,8 @@ const gameState = {
     animalCount: 2,
     animals: [],
     currentAnimalIndex: 0,
-    currentEnvironment: null
+    currentEnvironment: null,
+    usedEnvironments: []
 };
 
 // Main Menu Scene
@@ -152,6 +153,7 @@ class AnimalCountScene extends Phaser.Scene {
                 gameState.animalCount = count;
                 gameState.animals = [];
                 gameState.currentAnimalIndex = 0;
+                gameState.usedEnvironments = [];
 
                 for (let i = 0; i < count; i++) {
                     gameState.animals.push({
@@ -383,6 +385,17 @@ class WheelScene extends Phaser.Scene {
     create() {
         const { width, height } = this.cameras.main;
 
+        // Filter available environments (not used yet)
+        let availableEnvironments = GAME_DATA.environments.filter(env =>
+            !gameState.usedEnvironments.includes(env.name)
+        );
+
+        // If all environments have been used, reset the pool
+        if (availableEnvironments.length === 0) {
+            gameState.usedEnvironments = [];
+            availableEnvironments = [...GAME_DATA.environments];
+        }
+
         this.add.text(width / 2, 80, 'RAD VAN FORTUIN', {
             fontSize: '64px',
             color: '#ffffff',
@@ -394,7 +407,7 @@ class WheelScene extends Phaser.Scene {
         const centerX = width / 2;
         const centerY = height / 2;
         const radius = Math.min(width, height) * 0.35;
-        const segmentCount = GAME_DATA.environments.length;
+        const segmentCount = availableEnvironments.length;
         const anglePerSegment = (Math.PI * 2) / segmentCount;
 
         const colors = [0xFF5722, 0x2196F3, 0x4CAF50, 0xFFC107, 0x9C27B0, 0xFF9800, 0x00BCD4, 0x795548];
@@ -404,11 +417,24 @@ class WheelScene extends Phaser.Scene {
 
         // Draw wheel segments (draw at 0,0 relative to container)
         const graphics = this.add.graphics();
-        GAME_DATA.environments.forEach((env, i) => {
+
+        // Map environment names to short labels
+        const labelMap = {
+            'Vulkaan uitbarsting': 'Vulkaan',
+            'Dagen worden langer': 'Lange\ndagen',
+            'Overstroming': 'Over-\nstroming',
+            'Aardbeving': 'Aard-\nbeving',
+            'Sneeuwstorm': 'Sneeuw-\nstorm',
+            'Aardverschuiving': 'Aard-\nverschuiving',
+            'Vallei met alleen maar planten': 'Planten\nvallei',
+            'Sprinkhanenplaag': 'Sprink-\nhanen'
+        };
+
+        availableEnvironments.forEach((env, i) => {
             const startAngle = i * anglePerSegment - Math.PI / 2;
             const endAngle = (i + 1) * anglePerSegment - Math.PI / 2;
 
-            graphics.fillStyle(colors[i], 1);
+            graphics.fillStyle(colors[i % colors.length], 1);
             graphics.beginPath();
             graphics.moveTo(0, 0);
             graphics.arc(0, 0, radius, startAngle, endAngle, false);
@@ -420,19 +446,7 @@ class WheelScene extends Phaser.Scene {
             const textX = Math.cos(textAngle) * (radius * 0.7);
             const textY = Math.sin(textAngle) * (radius * 0.7);
 
-            // Short labels for the wheel
-            const labels = [
-                'Vulkaan',
-                'Lange\ndagen',
-                'Over-\nstroming',
-                'Aard-\nbeving',
-                'Sneeuw-\nstorm',
-                'Aard-\nverschuiving',
-                'Planten\nvallei',
-                'Sprink-\nhanen'
-            ];
-
-            const text = this.add.text(textX, textY, labels[i], {
+            const text = this.add.text(textX, textY, labelMap[env.name], {
                 fontSize: '18px',
                 color: '#ffffff',
                 fontFamily: 'Arial',
@@ -462,9 +476,10 @@ class WheelScene extends Phaser.Scene {
             onComplete: () => {
                 const normalizedAngle = (finalAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
                 const selectedIndex = Math.floor(normalizedAngle / anglePerSegment);
-                const selectedEnv = GAME_DATA.environments[selectedIndex];
+                const selectedEnv = availableEnvironments[selectedIndex];
 
                 gameState.currentEnvironment = selectedEnv;
+                gameState.usedEnvironments.push(selectedEnv.name);
 
                 this.time.delayedCall(1000, () => {
                     this.scene.start('ResultScene');
@@ -610,10 +625,86 @@ class ResultScene extends Phaser.Scene {
 
                 if (aliveAnimals.length === 0) {
                     this.scene.start('GameOverScene');
+                } else if (aliveAnimals.length === 1) {
+                    this.scene.start('YouWinScene');
                 } else {
                     this.scene.start('GamePlayScene');
                 }
             });
+        });
+    }
+}
+
+// You Win Scene
+class YouWinScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'YouWinScene' });
+    }
+
+    create() {
+        const { width, height } = this.cameras.main;
+
+        // Find the winning animal
+        const winner = gameState.animals.find(a => a.hitPoints > 0);
+
+        this.add.text(width / 2, height / 2 - 150, 'JE HEBT GEWONNEN!', {
+            fontSize: '64px',
+            color: '#FFD700',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        this.add.text(width / 2, height / 2 - 70, `Dier ${winner.id + 1} heeft overleefd!`, {
+            fontSize: '36px',
+            color: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        // Show the winning animal composite
+        const centerY = height / 2 + 50;
+
+        // Body
+        const lijfInfo = GAME_DATA.traits.lijf[winner.traits.lijf];
+        const lijfImage = lijfInfo.images[winner.variants.lijf];
+        const lijf = this.add.image(width / 2, centerY, lijfImage);
+        lijf.setDisplaySize(200, 140);
+
+        // Legs
+        const potenInfo = GAME_DATA.traits.poten[winner.traits.poten];
+        const potenImage = potenInfo.images[winner.variants.poten];
+        const poten = this.add.image(width / 2, centerY + 50, potenImage);
+        poten.setDisplaySize(180, 100);
+
+        // Eyes
+        const ogenInfo = GAME_DATA.traits.ogen[winner.traits.ogen];
+        const ogenImage = ogenInfo.images[winner.variants.ogen];
+        const ogen = this.add.image(width / 2, centerY - 40, ogenImage);
+        ogen.setDisplaySize(140, 90);
+
+        // Mouth/Food
+        const voedselInfo = GAME_DATA.traits.voedsel[winner.traits.voedsel];
+        const voedselImage = voedselInfo.images[winner.variants.voedsel];
+        const voedsel = this.add.image(width / 2, centerY + 20, voedselImage);
+        voedsel.setDisplaySize(120, 80);
+
+        // Show hit points
+        this.add.text(width / 2, centerY + 140, `❤️ ${winner.hitPoints}`, {
+            fontSize: '48px',
+            color: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        const restartButton = this.add.rectangle(width / 2, height - 100, 250, 60, 0x4CAF50)
+            .setInteractive({ useHandCursor: true });
+
+        this.add.text(width / 2, height - 100, 'OPNIEUW SPELEN', {
+            fontSize: '28px',
+            color: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        restartButton.on('pointerdown', () => {
+            this.scene.start('MainMenuScene');
         });
     }
 }
@@ -655,7 +746,7 @@ const config = {
     width: window.innerWidth,
     height: window.innerHeight,
     backgroundColor: '#2d2d2d',
-    scene: [MainMenuScene, AnimalCountScene, TraitSelectionScene, GamePlayScene, WheelScene, ResultScene, GameOverScene],
+    scene: [MainMenuScene, AnimalCountScene, TraitSelectionScene, GamePlayScene, WheelScene, ResultScene, YouWinScene, GameOverScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
