@@ -177,7 +177,7 @@ class TraitSelectionScene extends Phaser.Scene {
         // Load all trait images
         Object.values(GAME_DATA.traits).forEach(category => {
             Object.values(category).forEach(trait => {
-                this.load.image(trait.image, 'Evolutiespel afbeeldingen/' + trait.image);
+                this.load.image(trait.image, 'Evolutiespel afbeeldingen transparant/' + trait.image);
             });
         });
     }
@@ -306,33 +306,42 @@ class GamePlayScene extends Phaser.Scene {
             if (animal.hitPoints <= 0) return;
 
             const x = spacing * (index + 1);
-            const y = height / 2 - 50;
+            const y = height / 2;
 
             // Show animal number
-            this.add.text(x, y - 250, `Dier ${animal.id + 1}`, {
+            this.add.text(x, y - 280, `Dier ${animal.id + 1}`, {
                 fontSize: '42px',
                 color: '#ffffff',
                 fontFamily: 'Arial',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
 
-            // Show trait images
-            const traitOrder = ['ogen', 'poten', 'lijf', 'voedsel'];
-            let imageY = y - 180;
+            // Composite trait images into one unified animal
+            // Layer order: lijf (body) at bottom, then poten (legs), voedsel (mouth), ogen (eyes) on top
+            const centerY = y - 80;
 
-            traitOrder.forEach((category) => {
-                const traitKey = animal.traits[category];
-                const traitInfo = GAME_DATA.traits[category][traitKey];
+            // Body (largest, centered)
+            const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
+            const lijf = this.add.image(x, centerY, lijfInfo.image);
+            lijf.setDisplaySize(200, 140);
 
-                // Add trait image
-                const img = this.add.image(x, imageY, traitInfo.image);
-                img.setDisplaySize(120, 80);
+            // Legs (bottom of body)
+            const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
+            const poten = this.add.image(x, centerY + 50, potenInfo.image);
+            poten.setDisplaySize(180, 100);
 
-                imageY += 90;
-            });
+            // Eyes (top of body)
+            const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
+            const ogen = this.add.image(x, centerY - 40, ogenInfo.image);
+            ogen.setDisplaySize(140, 90);
+
+            // Mouth/Food (middle-lower part of body)
+            const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
+            const voedsel = this.add.image(x, centerY + 20, voedselInfo.image);
+            voedsel.setDisplaySize(120, 80);
 
             // Show hit points
-            this.add.text(x, y + 200, `❤️ ${animal.hitPoints}`, {
+            this.add.text(x, y + 150, `❤️ ${animal.hitPoints}`, {
                 fontSize: '48px',
                 color: '#ffffff',
                 fontFamily: 'Arial'
@@ -491,32 +500,39 @@ class ResultScene extends Phaser.Scene {
                 color = '#4CAF50';
             }
 
-            // Draw animal with trait images
-            const animalColor = [0xFF5722, 0x2196F3, 0x4CAF50, 0xFFC107][index];
-
-            this.add.text(x, y - 180, `Dier ${animal.id + 1}`, {
+            // Draw composite animal
+            this.add.text(x, y - 240, `Dier ${animal.id + 1}`, {
                 fontSize: '32px',
                 color: '#ffffff',
                 fontFamily: 'Arial',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
 
-            // Show small trait images
-            const traitOrder = ['ogen', 'poten', 'lijf', 'voedsel'];
-            let imageY = y - 130;
+            // Composite trait images into one unified animal
+            const centerY = y - 70;
 
-            traitOrder.forEach((category) => {
-                const traitKey = animal.traits[category];
-                const traitInfo = GAME_DATA.traits[category][traitKey];
+            // Body (largest, centered)
+            const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
+            const lijf = this.add.image(x, centerY, lijfInfo.image);
+            lijf.setDisplaySize(160, 110);
 
-                const img = this.add.image(x, imageY, traitInfo.image);
-                img.setDisplaySize(80, 55);
+            // Legs (bottom of body)
+            const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
+            const poten = this.add.image(x, centerY + 40, potenInfo.image);
+            poten.setDisplaySize(140, 80);
 
-                imageY += 60;
-            });
+            // Eyes (top of body)
+            const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
+            const ogen = this.add.image(x, centerY - 30, ogenInfo.image);
+            ogen.setDisplaySize(110, 70);
+
+            // Mouth/Food (middle-lower part of body)
+            const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
+            const voedsel = this.add.image(x, centerY + 15, voedselInfo.image);
+            voedsel.setDisplaySize(90, 60);
 
             // Show effect
-            const effectText = this.add.text(x, y + 110, effect, {
+            const effectText = this.add.text(x, y + 60, effect, {
                 fontSize: '48px',
                 color: color,
                 fontFamily: 'Arial',
@@ -526,21 +542,21 @@ class ResultScene extends Phaser.Scene {
             // Animate effect
             this.tweens.add({
                 targets: effectText,
-                y: y + 60,
+                y: y + 20,
                 alpha: 0,
                 duration: 1500,
                 ease: 'Power2'
             });
 
             // Show new hit points
-            this.add.text(x, y + 180, `❤️ ${animal.hitPoints}`, {
+            this.add.text(x, y + 120, `❤️ ${animal.hitPoints}`, {
                 fontSize: '42px',
                 color: '#ffffff',
                 fontFamily: 'Arial'
             }).setOrigin(0.5);
 
             if (animal.hitPoints <= 0) {
-                this.add.text(x, y + 240, '💀 DOOD', {
+                this.add.text(x, y + 180, '💀 DOOD', {
                     fontSize: '36px',
                     color: '#FF0000',
                     fontFamily: 'Arial',
