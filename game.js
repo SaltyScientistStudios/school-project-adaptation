@@ -1,13 +1,24 @@
-// Image position offsets for fine-tuning specific images
+// Image position offsets and rotations for fine-tuning specific images
 const IMAGE_OFFSETS = {
-    // Mouth that needs to be lower
-    'Dieet 2 planten 2 kleur.png': { y: 15 },
+    // Mouths - move down to align properly
+    'Dieet 1 planten 1 kleur.png': { y: 15 },
+    'Dieet 2 planten 2 kleur.png': { y: 15, rotation: -8 },
+    'Dieet 3 vlees 1 kleur.png': { y: 15 },
+    'Dieet 4 vlees 2 kleur.png': { y: 15 },
     // Flying legs 2 needs to be higher (it's lower than others)
     'Poten 2 vliegen 2 kleur.png': { y: -25 }
 };
 
 // Base offset for all legs (move up)
 const LEGS_BASE_OFFSET = -15;
+
+// Consistent animal part sizes across all scenes
+const ANIMAL_SIZES = {
+    poten: { width: 270, height: 165 },
+    lijf: { width: 160, height: 110 },
+    ogen: { width: 110, height: 70 },
+    voedsel: { width: 90, height: 60 }
+};
 
 // Game data configuration
 const GAME_DATA = {
@@ -38,7 +49,7 @@ const GAME_DATA = {
         },
         {
             name: 'Dagen worden langer',
-            description: "Door de stand van de zon worden de dagen langer en kan er's nachts minder voedsel worden gevonden",
+            description: "Door de stand van de zon worden de dagen langer en kan er s' nachts minder voedsel worden gevonden",
             affects: 'B',
             background: '#FFD700'
         },
@@ -62,7 +73,7 @@ const GAME_DATA = {
         },
         {
             name: 'Aardverschuiving',
-            description: 'Er komen een heel veel stenen op je af gedenderd!',
+            description: 'Er komen heel veel stenen op je af gedenderd!',
             affects: 'F',
             background: '#696969'
         },
@@ -87,8 +98,39 @@ const gameState = {
     animals: [],
     currentAnimalIndex: 0,
     currentEnvironment: null,
-    usedEnvironments: []
+    usedEnvironments: [],
+    soundEnabled: true
 };
+
+// Helper function to add sound toggle button to any scene
+function addSoundToggle(scene) {
+    const { width, height } = scene.cameras.main;
+    const padding = 20;
+
+    const updateIcon = () => {
+        soundIcon.setText(gameState.soundEnabled ? '🔊' : '🔇');
+    };
+
+    const soundIcon = scene.add.text(width - padding, height - padding, '🔊', {
+        fontSize: '36px'
+    }).setOrigin(1, 1).setInteractive({ useHandCursor: true });
+
+    updateIcon();
+
+    soundIcon.on('pointerdown', () => {
+        gameState.soundEnabled = !gameState.soundEnabled;
+        scene.sound.mute = !gameState.soundEnabled;
+        updateIcon();
+    });
+
+    soundIcon.on('pointerover', () => soundIcon.setAlpha(0.7));
+    soundIcon.on('pointerout', () => soundIcon.setAlpha(1));
+
+    // Ensure sound state is synced
+    scene.sound.mute = !gameState.soundEnabled;
+
+    return soundIcon;
+}
 
 // Main Menu Scene
 class MainMenuScene extends Phaser.Scene {
@@ -102,6 +144,8 @@ class MainMenuScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.cameras.main;
+
+        addSoundToggle(this);
 
         this.add.text(width / 2, height / 3, 'EVOLUTIESPEL', {
             fontSize: '64px',
@@ -146,6 +190,9 @@ class MainMenuScene extends Phaser.Scene {
         creditsButton.on('pointerdown', () => {
             this.scene.start('CreditsScene');
         });
+
+        // Handle resize
+        this.scale.on('resize', () => this.scene.restart());
     }
 }
 
@@ -157,6 +204,8 @@ class CreditsScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.cameras.main;
+
+        addSoundToggle(this);
 
         this.add.text(width / 2, 100, 'CREDITS', {
             fontSize: '48px',
@@ -200,6 +249,9 @@ class CreditsScene extends Phaser.Scene {
         backButton.on('pointerdown', () => {
             this.scene.start('MainMenuScene');
         });
+
+        // Handle resize
+        this.scale.on('resize', () => this.scene.restart());
     }
 }
 
@@ -211,6 +263,8 @@ class AnimalCountScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.cameras.main;
+
+        addSoundToggle(this);
 
         this.add.text(width / 2, 100, 'HOEVEEL DIEREN?', {
             fontSize: '48px',
@@ -258,6 +312,9 @@ class AnimalCountScene extends Phaser.Scene {
                 this.scene.start('TraitSelectionScene');
             });
         });
+
+        // Handle resize
+        this.scale.on('resize', () => this.scene.restart());
     }
 }
 
@@ -283,10 +340,14 @@ class TraitSelectionScene extends Phaser.Scene {
     }
 
     create() {
+        // Register cleanup for when scene is shut down
+        this.events.on('shutdown', this.cleanup, this);
+        this.events.on('destroy', this.cleanup, this);
+
         this.showTraitSelection();
     }
 
-    shutdown() {
+    cleanup() {
         // Clean up DOM input when leaving scene
         if (this.nameInput) {
             this.nameInput.remove();
@@ -305,9 +366,12 @@ class TraitSelectionScene extends Phaser.Scene {
         const { width, height } = this.cameras.main;
         const animal = gameState.animals[gameState.currentAnimalIndex];
 
-        // Name label
-        this.add.text(width / 2 - 150, 45, 'NAAM:', {
-            fontSize: '32px',
+        addSoundToggle(this);
+
+        // Name label (on the left side)
+        const leftCenterX = width * 0.35;
+        this.add.text(leftCenterX - 180, 50, 'NAAM:', {
+            fontSize: '28px',
             color: '#ffffff',
             fontFamily: 'Arial',
             fontStyle: 'bold'
@@ -320,11 +384,11 @@ class TraitSelectionScene extends Phaser.Scene {
         this.nameInput.placeholder = 'Voer naam in...';
         this.nameInput.style.cssText = `
             position: absolute;
-            left: ${window.innerWidth / 2 - 50}px;
-            top: 30px;
-            width: 200px;
+            left: ${window.innerWidth * 0.35 - 70}px;
+            top: 32px;
+            width: 180px;
             height: 36px;
-            font-size: 24px;
+            font-size: 22px;
             font-family: Arial;
             padding: 5px 10px;
             border: 2px solid #4CAF50;
@@ -346,14 +410,15 @@ class TraitSelectionScene extends Phaser.Scene {
             voedsel: 'VOEDSEL'
         };
 
-        const startY = 140;
-        const rowHeight = 140;
+        // Left side for trait selection
+        const startY = 180;
+        const rowHeight = 150;
 
         traitCategories.forEach((category, rowIndex) => {
             const y = startY + rowIndex * rowHeight;
 
-            this.add.text(width / 2, y - 60, categoryNames[category], {
-                fontSize: '28px',
+            this.add.text(leftCenterX, y - 60, categoryNames[category], {
+                fontSize: '24px',
                 color: '#ffffff',
                 fontFamily: 'Arial',
                 fontStyle: 'bold'
@@ -364,8 +429,8 @@ class TraitSelectionScene extends Phaser.Scene {
 
             // Show all 4 image variants (2 per trait type)
             let iconIndex = 0;
-            const iconSpacing = 160;
-            const startX = width / 2 - (iconSpacing * 1.5);
+            const iconSpacing = 130;
+            const startX = leftCenterX - (iconSpacing * 1.5);
 
             traitKeys.forEach((traitKey) => {
                 const trait = traits[traitKey];
@@ -375,13 +440,13 @@ class TraitSelectionScene extends Phaser.Scene {
                     const isSelected = animal.traits[category] === traitKey && animal.variants[category] === variantIndex;
 
                     // Background for selection
-                    const bg = this.add.rectangle(x, y, 130, 100, isSelected ? 0x4CAF50 : 0x424242, isSelected ? 1 : 0.3);
+                    const bg = this.add.rectangle(x, y, 110, 85, isSelected ? 0x4CAF50 : 0x424242, isSelected ? 1 : 0.3);
                     bg.setStrokeStyle(3, isSelected ? 0x4CAF50 : 0x666666);
                     bg.setInteractive({ useHandCursor: true });
 
                     // Trait image
                     const img = this.add.image(x, y, imageName);
-                    img.setDisplaySize(100, 70);
+                    img.setDisplaySize(85, 60);
                     img.setInteractive({ useHandCursor: true });
 
                     // Click handler
@@ -408,6 +473,73 @@ class TraitSelectionScene extends Phaser.Scene {
             });
         });
 
+        // Right side - Preview panel
+        const previewX = width * 0.78;
+        const previewY = height / 2;
+        const previewWidth = width * 0.35;
+        const previewHeight = height * 0.7;
+
+        // Preview background rectangle
+        this.add.rectangle(previewX, previewY, previewWidth, previewHeight, 0x333333, 0.8)
+            .setStrokeStyle(3, 0x4CAF50);
+
+        this.add.text(previewX, previewY - previewHeight / 2 + 30, 'VOORBEELD', {
+            fontSize: '28px',
+            color: '#4CAF50',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Draw preview creature if any traits are selected
+        const hasAnyTrait = traitCategories.some(cat => animal.traits[cat] !== null);
+
+        if (hasAnyTrait) {
+            const creatureY = previewY + 20;
+
+            // Legs (if selected) - attached to body
+            if (animal.traits.poten) {
+                const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
+                const potenImage = potenInfo.images[animal.variants.poten];
+                const potenOffset = (IMAGE_OFFSETS[potenImage]?.y || 0) + LEGS_BASE_OFFSET;
+                const poten = this.add.image(previewX, creatureY + 10 + potenOffset, potenImage);
+                poten.setDisplaySize(ANIMAL_SIZES.poten.width, ANIMAL_SIZES.poten.height);
+            }
+
+            // Body (if selected) - at top
+            if (animal.traits.lijf) {
+                const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
+                const lijfImage = lijfInfo.images[animal.variants.lijf];
+                const lijf = this.add.image(previewX, creatureY - 30, lijfImage);
+                lijf.setDisplaySize(ANIMAL_SIZES.lijf.width, ANIMAL_SIZES.lijf.height);
+            }
+
+            // Eyes/Head (if selected) - below body
+            if (animal.traits.ogen) {
+                const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
+                const ogenImage = ogenInfo.images[animal.variants.ogen];
+                const ogen = this.add.image(previewX, creatureY + 50, ogenImage);
+                ogen.setDisplaySize(ANIMAL_SIZES.ogen.width, ANIMAL_SIZES.ogen.height);
+            }
+
+            // Mouth (if selected) - below eyes
+            if (animal.traits.voedsel) {
+                const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
+                const voedselImage = voedselInfo.images[animal.variants.voedsel];
+                const voedselOffset = IMAGE_OFFSETS[voedselImage]?.y || 0;
+                const voedselRotation = IMAGE_OFFSETS[voedselImage]?.rotation || 0;
+                const voedsel = this.add.image(previewX, creatureY + 90 + voedselOffset, voedselImage);
+                voedsel.setDisplaySize(ANIMAL_SIZES.voedsel.width, ANIMAL_SIZES.voedsel.height);
+                voedsel.setAngle(voedselRotation);
+            }
+        } else {
+            this.add.text(previewX, previewY, 'Selecteer\neigenschappen', {
+                fontSize: '24px',
+                color: '#888888',
+                fontFamily: 'Arial',
+                align: 'center'
+            }).setOrigin(0.5);
+        }
+
         // Check if all traits are selected
         const allTraitsSelected = traitCategories.every(cat => animal.traits[cat] !== null);
 
@@ -428,10 +560,14 @@ class TraitSelectionScene extends Phaser.Scene {
                 if (gameState.currentAnimalIndex < gameState.animalCount) {
                     this.showTraitSelection();
                 } else {
+                    this.cleanup(); // Remove input before leaving
                     this.scene.start('GamePlayScene');
                 }
             });
         }
+
+        // Handle resize
+        this.scale.on('resize', () => this.showTraitSelection());
     }
 }
 
@@ -445,6 +581,9 @@ class GamePlayScene extends Phaser.Scene {
         this.showAnimals();
 
         const { width, height } = this.cameras.main;
+
+        addSoundToggle(this);
+
         this.add.text(width / 2, height - 80, 'Druk op SPATIE voor het rad', {
             fontSize: '32px',
             color: '#ffffff',
@@ -455,6 +594,9 @@ class GamePlayScene extends Phaser.Scene {
         this.input.keyboard.on('keydown-SPACE', () => {
             this.scene.start('WheelScene');
         });
+
+        // Handle resize
+        this.scale.on('resize', () => this.scene.restart());
     }
 
     showAnimals() {
@@ -476,34 +618,36 @@ class GamePlayScene extends Phaser.Scene {
             }).setOrigin(0.5);
 
             // Composite trait images into one unified animal
-            // Layer order: poten (legs) at back, then lijf (body), voedsel (mouth), ogen (eyes) on top
+            // Layer order: poten (legs) at back, then lijf (body), ogen (eyes), voedsel (mouth)
             const centerY = y - 80;
 
-            // Legs (back layer, 50% bigger)
+            // Legs (attached to body)
             const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
             const potenImage = potenInfo.images[animal.variants.poten];
             const potenOffset = (IMAGE_OFFSETS[potenImage]?.y || 0) + LEGS_BASE_OFFSET;
-            const poten = this.add.image(x, centerY + 70 + potenOffset, potenImage);
-            poten.setDisplaySize(330, 195);
+            const poten = this.add.image(x, centerY + 10 + potenOffset, potenImage);
+            poten.setDisplaySize(ANIMAL_SIZES.poten.width, ANIMAL_SIZES.poten.height);
 
-            // Body (centered)
+            // Body (at top)
             const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
             const lijfImage = lijfInfo.images[animal.variants.lijf];
-            const lijf = this.add.image(x, centerY, lijfImage);
-            lijf.setDisplaySize(200, 140);
+            const lijf = this.add.image(x, centerY - 30, lijfImage);
+            lijf.setDisplaySize(ANIMAL_SIZES.lijf.width, ANIMAL_SIZES.lijf.height);
 
-            // Eyes (on body, lower)
+            // Eyes/Head (below body)
             const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
             const ogenImage = ogenInfo.images[animal.variants.ogen];
-            const ogen = this.add.image(x, centerY + 30, ogenImage);
-            ogen.setDisplaySize(140, 90);
+            const ogen = this.add.image(x, centerY + 50, ogenImage);
+            ogen.setDisplaySize(ANIMAL_SIZES.ogen.width, ANIMAL_SIZES.ogen.height);
 
-            // Mouth/Food (lower, below eyes)
+            // Mouth (below eyes)
             const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
             const voedselImage = voedselInfo.images[animal.variants.voedsel];
             const voedselOffset = IMAGE_OFFSETS[voedselImage]?.y || 0;
+            const voedselRotation = IMAGE_OFFSETS[voedselImage]?.rotation || 0;
             const voedsel = this.add.image(x, centerY + 90 + voedselOffset, voedselImage);
-            voedsel.setDisplaySize(120, 80);
+            voedsel.setDisplaySize(ANIMAL_SIZES.voedsel.width, ANIMAL_SIZES.voedsel.height);
+            voedsel.setAngle(voedselRotation);
 
             // Show hit points
             this.add.text(x, y + 150, `❤️ ${animal.hitPoints}`, {
@@ -527,6 +671,8 @@ class WheelScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.cameras.main;
+
+        addSoundToggle(this);
 
         this.add.text(width / 2, 80, 'RAD VAN FORTUIN', {
             fontSize: '64px',
@@ -590,8 +736,8 @@ class WheelScene extends Phaser.Scene {
 
         wheelContainer.add(graphics);
 
-        // Pointer (fixed position, doesn't rotate)
-        const pointer = this.add.triangle(centerX, centerY - radius - 30, 0, 0, -20, 40, 20, 40, 0xFF0000);
+        // Pointer (fixed position on the right, pointing left)
+        const pointer = this.add.triangle(centerX + radius + 30, centerY, 0, 0, 40, -20, 40, 20, 0xFF0000);
 
         // Spin the wheel
         let currentAngle = 0;
@@ -608,7 +754,9 @@ class WheelScene extends Phaser.Scene {
             duration: spinDuration,
             ease: 'Cubic.easeOut',
             onComplete: () => {
-                const normalizedAngle = (finalAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+                // Adjust for pointer on the right (add π/2 to account for 90 degree offset)
+                const adjustedAngle = finalAngle + Math.PI / 2;
+                const normalizedAngle = (adjustedAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
                 const selectedIndex = Math.floor(normalizedAngle / anglePerSegment);
                 const selectedEnv = GAME_DATA.environments[selectedIndex];
 
@@ -631,6 +779,8 @@ class ResultScene extends Phaser.Scene {
     create() {
         const { width, height } = this.cameras.main;
         const env = gameState.currentEnvironment;
+
+        addSoundToggle(this);
 
         // Change background color based on environment
         this.cameras.main.setBackgroundColor(env.background);
@@ -664,12 +814,6 @@ class ResultScene extends Phaser.Scene {
 
             if (hasAffectedTrait) {
                 animal.hitPoints--;
-                effect = '-1 ❤️';
-                color = '#F44336';
-            } else {
-                animal.hitPoints++;
-                effect = '+1 ❤️';
-                color = '#4CAF50';
             }
 
             // Draw composite animal
@@ -680,52 +824,80 @@ class ResultScene extends Phaser.Scene {
                 fontStyle: 'bold'
             }).setOrigin(0.5);
 
+            // Create container for animal parts (for shake animation)
+            const animalContainer = this.add.container(x, 0);
+
             // Composite trait images into one unified animal
-            // Layer order: poten (legs) at back, then lijf (body), voedsel (mouth), ogen (eyes) on top
+            // Layer order: poten (legs) at back, then lijf (body), ogen (eyes), voedsel (mouth)
             const centerY = y - 70;
 
-            // Legs (back layer, 50% bigger)
+            // Legs (attached to body)
             const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
             const potenImage = potenInfo.images[animal.variants.poten];
             const potenOffset = (IMAGE_OFFSETS[potenImage]?.y || 0) + LEGS_BASE_OFFSET;
-            const poten = this.add.image(x, centerY + 55 + potenOffset, potenImage);
-            poten.setDisplaySize(270, 165);
+            const poten = this.add.image(0, centerY + 10 + potenOffset, potenImage);
+            poten.setDisplaySize(ANIMAL_SIZES.poten.width, ANIMAL_SIZES.poten.height);
+            animalContainer.add(poten);
 
-            // Body (centered)
+            // Body (at top)
             const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
             const lijfImage = lijfInfo.images[animal.variants.lijf];
-            const lijf = this.add.image(x, centerY, lijfImage);
-            lijf.setDisplaySize(160, 110);
+            const lijf = this.add.image(0, centerY - 30, lijfImage);
+            lijf.setDisplaySize(ANIMAL_SIZES.lijf.width, ANIMAL_SIZES.lijf.height);
+            animalContainer.add(lijf);
 
-            // Eyes (on body, lower)
+            // Eyes/Head (below body)
             const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
             const ogenImage = ogenInfo.images[animal.variants.ogen];
-            const ogen = this.add.image(x, centerY + 25, ogenImage);
-            ogen.setDisplaySize(110, 70);
+            const ogen = this.add.image(0, centerY + 50, ogenImage);
+            ogen.setDisplaySize(ANIMAL_SIZES.ogen.width, ANIMAL_SIZES.ogen.height);
+            animalContainer.add(ogen);
 
-            // Mouth/Food (lower, below eyes)
+            // Mouth (below eyes)
             const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
             const voedselImage = voedselInfo.images[animal.variants.voedsel];
             const voedselOffset = IMAGE_OFFSETS[voedselImage]?.y || 0;
-            const voedsel = this.add.image(x, centerY + 70 + voedselOffset, voedselImage);
-            voedsel.setDisplaySize(90, 60);
+            const voedselRotation = IMAGE_OFFSETS[voedselImage]?.rotation || 0;
+            const voedsel = this.add.image(0, centerY + 90 + voedselOffset, voedselImage);
+            voedsel.setDisplaySize(ANIMAL_SIZES.voedsel.width, ANIMAL_SIZES.voedsel.height);
+            voedsel.setAngle(voedselRotation);
+            animalContainer.add(voedsel);
 
-            // Show effect
-            const effectText = this.add.text(x, y + 60, effect, {
-                fontSize: '48px',
-                color: color,
-                fontFamily: 'Arial',
-                fontStyle: 'bold'
-            }).setOrigin(0.5);
+            // Show effect animation only when health is lost
+            if (hasAffectedTrait) {
+                const effectText = this.add.text(x, y + 60, '-1 ❤️', {
+                    fontSize: '48px',
+                    color: '#F44336',
+                    fontFamily: 'Arial',
+                    fontStyle: 'bold'
+                }).setOrigin(0.5);
 
-            // Animate effect
-            this.tweens.add({
-                targets: effectText,
-                y: y + 20,
-                alpha: 0,
-                duration: 1500,
-                ease: 'Power2'
-            });
+                // Animate effect text
+                this.tweens.add({
+                    targets: effectText,
+                    y: y + 20,
+                    alpha: 0,
+                    duration: 1500,
+                    ease: 'Power2'
+                });
+
+                // Flash red tint on all animal parts
+                const animalParts = [poten, lijf, ogen, voedsel];
+                animalParts.forEach(part => part.setTint(0xff0000));
+                this.time.delayedCall(150, () => {
+                    animalParts.forEach(part => part.clearTint());
+                });
+
+                // Shake animation
+                this.tweens.add({
+                    targets: animalContainer,
+                    x: x + 15,
+                    duration: 50,
+                    yoyo: true,
+                    repeat: 5,
+                    ease: 'Sine.easeInOut'
+                });
+            }
 
             // Show new hit points
             this.add.text(x, y + 120, `❤️ ${animal.hitPoints}`, {
@@ -735,6 +907,17 @@ class ResultScene extends Phaser.Scene {
             }).setOrigin(0.5);
 
             if (animal.hitPoints <= 0) {
+                // Death animation - turn gray and flip upside down
+                const animalParts = [poten, lijf, ogen, voedsel];
+                animalParts.forEach(part => part.setTint(0x666666));
+
+                this.tweens.add({
+                    targets: animalContainer,
+                    angle: 180,
+                    duration: 800,
+                    ease: 'Back.easeIn'
+                });
+
                 this.add.text(x, y + 180, '💀 DOOD', {
                     fontSize: '36px',
                     color: '#FF0000',
@@ -778,6 +961,8 @@ class GameOverScene extends Phaser.Scene {
     create() {
         const { width, height } = this.cameras.main;
 
+        addSoundToggle(this);
+
         this.add.text(width / 2, height / 2 - 50, 'ALLE DIEREN ZIJN DOOD!', {
             fontSize: '48px',
             color: '#ffffff',
@@ -797,6 +982,9 @@ class GameOverScene extends Phaser.Scene {
         restartButton.on('pointerdown', () => {
             this.scene.start('MainMenuScene');
         });
+
+        // Handle resize
+        this.scale.on('resize', () => this.scene.restart());
     }
 }
 
