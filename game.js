@@ -63,7 +63,7 @@ const GAME_DATA = {
             name: 'Aardbeving',
             description: 'Er ontstaat een grote kloof tussen de soort en hun voedsel',
             affects: 'D',
-            background: '#8B4513'
+            background: '#A0522D'
         },
         {
             name: 'Sneeuwstorm',
@@ -688,8 +688,6 @@ class WheelScene extends Phaser.Scene {
         const segmentCount = GAME_DATA.environments.length;
         const anglePerSegment = (Math.PI * 2) / segmentCount;
 
-        const colors = [0xFF5722, 0x2196F3, 0x4CAF50, 0xFFC107, 0x9C27B0, 0xFF9800, 0x00BCD4, 0x795548];
-
         // Create container for wheel to rotate properly
         const wheelContainer = this.add.container(centerX, centerY);
 
@@ -699,7 +697,9 @@ class WheelScene extends Phaser.Scene {
             const startAngle = i * anglePerSegment - Math.PI / 2;
             const endAngle = (i + 1) * anglePerSegment - Math.PI / 2;
 
-            graphics.fillStyle(colors[i], 1);
+            // Use the environment's background color for the wheel segment
+            const envColor = parseInt(env.background.replace('#', '0x'));
+            graphics.fillStyle(envColor, 1);
             graphics.beginPath();
             graphics.moveTo(0, 0);
             graphics.arc(0, 0, radius, startAngle, endAngle, false);
@@ -762,7 +762,17 @@ class WheelScene extends Phaser.Scene {
 
                 gameState.currentEnvironment = selectedEnv;
 
-                this.time.delayedCall(1000, () => {
+                // Show what we landed on
+                const resultText = this.add.text(width / 2, height - 80, selectedEnv.name.toUpperCase(), {
+                    fontSize: '48px',
+                    color: selectedEnv.background,
+                    fontFamily: 'Arial',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setOrigin(0.5);
+
+                this.time.delayedCall(1500, () => {
                     this.scene.start('ResultScene');
                 });
             }
@@ -944,6 +954,10 @@ class ResultScene extends Phaser.Scene {
 
                 if (aliveAnimals.length === 0) {
                     this.scene.start('GameOverScene');
+                } else if (aliveAnimals.length === 1 && gameState.animalCount > 1) {
+                    // Only 1 animal left - they win!
+                    gameState.winner = aliveAnimals[0];
+                    this.scene.start('YouWinScene');
                 } else {
                     this.scene.start('GamePlayScene');
                 }
@@ -988,13 +1002,161 @@ class GameOverScene extends Phaser.Scene {
     }
 }
 
+// You Win Scene
+class YouWinScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'YouWinScene' });
+    }
+
+    create() {
+        const { width, height } = this.cameras.main;
+        const winner = gameState.winner;
+
+        addSoundToggle(this);
+
+        // Victory background
+        this.cameras.main.setBackgroundColor('#1a1a2e');
+
+        // Confetti particles
+        this.createConfetti(width, height);
+
+        // Fireworks
+        this.createFireworks(width, height);
+
+        // Winner text
+        this.add.text(width / 2, 80, 'GEWONNEN!', {
+            fontSize: '72px',
+            color: '#FFD700',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0.5);
+
+        // Winner name
+        this.add.text(width / 2, 160, `${winner.name} heeft gewonnen!`, {
+            fontSize: '36px',
+            color: '#ffffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Draw the winning animal
+        const animalY = height / 2 + 30;
+
+        // Legs
+        const potenInfo = GAME_DATA.traits.poten[winner.traits.poten];
+        const potenImage = potenInfo.images[winner.variants.poten];
+        const potenOffset = (IMAGE_OFFSETS[potenImage]?.y || 0) + LEGS_BASE_OFFSET;
+        const poten = this.add.image(width / 2, animalY + 10 + potenOffset, potenImage);
+        poten.setDisplaySize(ANIMAL_SIZES.poten.width, ANIMAL_SIZES.poten.height);
+
+        // Body
+        const lijfInfo = GAME_DATA.traits.lijf[winner.traits.lijf];
+        const lijfImage = lijfInfo.images[winner.variants.lijf];
+        const lijf = this.add.image(width / 2, animalY - 30, lijfImage);
+        lijf.setDisplaySize(ANIMAL_SIZES.lijf.width, ANIMAL_SIZES.lijf.height);
+
+        // Eyes
+        const ogenInfo = GAME_DATA.traits.ogen[winner.traits.ogen];
+        const ogenImage = ogenInfo.images[winner.variants.ogen];
+        const ogen = this.add.image(width / 2, animalY + 50, ogenImage);
+        ogen.setDisplaySize(ANIMAL_SIZES.ogen.width, ANIMAL_SIZES.ogen.height);
+
+        // Mouth
+        const voedselInfo = GAME_DATA.traits.voedsel[winner.traits.voedsel];
+        const voedselImage = voedselInfo.images[winner.variants.voedsel];
+        const voedselOffset = IMAGE_OFFSETS[voedselImage]?.y || 0;
+        const voedselRotation = IMAGE_OFFSETS[voedselImage]?.rotation || 0;
+        const voedsel = this.add.image(width / 2, animalY + 90 + voedselOffset, voedselImage);
+        voedsel.setDisplaySize(ANIMAL_SIZES.voedsel.width, ANIMAL_SIZES.voedsel.height);
+        voedsel.setAngle(voedselRotation);
+
+        // Restart button
+        const restartButton = this.add.rectangle(width / 2, height - 80, 250, 60, 0x4CAF50)
+            .setInteractive({ useHandCursor: true });
+
+        this.add.text(width / 2, height - 80, 'OPNIEUW SPELEN', {
+            fontSize: '28px',
+            color: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        restartButton.on('pointerdown', () => {
+            this.scene.start('MainMenuScene');
+        });
+    }
+
+    createConfetti(width, height) {
+        const colors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0xFFD700, 0xFF6B6B];
+
+        // Create falling confetti
+        for (let i = 0; i < 100; i++) {
+            const x = Phaser.Math.Between(0, width);
+            const y = Phaser.Math.Between(-height, 0);
+            const color = Phaser.Utils.Array.GetRandom(colors);
+            const size = Phaser.Math.Between(5, 12);
+
+            const confetti = this.add.rectangle(x, y, size, size * 2, color);
+            confetti.setAngle(Phaser.Math.Between(0, 360));
+
+            this.tweens.add({
+                targets: confetti,
+                y: height + 50,
+                x: x + Phaser.Math.Between(-100, 100),
+                angle: confetti.angle + Phaser.Math.Between(-360, 360),
+                duration: Phaser.Math.Between(3000, 6000),
+                repeat: -1,
+                delay: Phaser.Math.Between(0, 2000)
+            });
+        }
+    }
+
+    createFireworks(width, height) {
+        const colors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0xFFD700];
+
+        // Create periodic fireworks
+        const launchFirework = () => {
+            const x = Phaser.Math.Between(width * 0.2, width * 0.8);
+            const y = Phaser.Math.Between(height * 0.2, height * 0.5);
+            const color = Phaser.Utils.Array.GetRandom(colors);
+
+            // Create explosion particles
+            for (let i = 0; i < 20; i++) {
+                const angle = (i / 20) * Math.PI * 2;
+                const speed = Phaser.Math.Between(50, 150);
+                const particle = this.add.circle(x, y, Phaser.Math.Between(3, 6), color);
+
+                this.tweens.add({
+                    targets: particle,
+                    x: x + Math.cos(angle) * speed,
+                    y: y + Math.sin(angle) * speed,
+                    alpha: 0,
+                    scale: 0.5,
+                    duration: 1000,
+                    ease: 'Power2',
+                    onComplete: () => particle.destroy()
+                });
+            }
+        };
+
+        // Launch fireworks periodically
+        launchFirework();
+        this.time.addEvent({
+            delay: 800,
+            callback: launchFirework,
+            loop: true
+        });
+    }
+}
+
 // Game configuration
 const config = {
     type: Phaser.AUTO,
     width: window.innerWidth,
     height: window.innerHeight,
     backgroundColor: '#2d2d2d',
-    scene: [MainMenuScene, CreditsScene, AnimalCountScene, TraitSelectionScene, GamePlayScene, WheelScene, ResultScene, GameOverScene],
+    scene: [MainMenuScene, CreditsScene, AnimalCountScene, TraitSelectionScene, GamePlayScene, WheelScene, ResultScene, GameOverScene, YouWinScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
