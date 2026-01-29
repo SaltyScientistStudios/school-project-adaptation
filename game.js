@@ -1142,7 +1142,7 @@ class GameOverScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Replay with same animals button
-        const replayButton = this.add.rectangle(width / 2, height / 2 + 50, 300, 60, 0xFF9800)
+        const replayButton = this.add.rectangle(width / 2, height / 2 + 50, 380, 60, 0xFF9800)
             .setInteractive({ useHandCursor: true });
 
         this.add.text(width / 2, height / 2 + 50, 'OPNIEUW (ZELFDE DIEREN)', {
@@ -1256,7 +1256,7 @@ class YouWinScene extends Phaser.Scene {
         voedsel.setAngle(voedselRotation);
 
         // Replay with same animals button
-        const replayButton = this.add.rectangle(width / 2, height - 150, 300, 50, 0xFF9800)
+        const replayButton = this.add.rectangle(width / 2, height - 150, 380, 50, 0xFF9800)
             .setInteractive({ useHandCursor: true });
 
         this.add.text(width / 2, height - 150, 'OPNIEUW (ZELFDE DIEREN)', {
