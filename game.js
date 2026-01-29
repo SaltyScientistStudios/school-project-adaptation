@@ -1,8 +1,34 @@
+// Game version and changelog
+const GAME_VERSION = 'v1.0.1';
+const CHANGELOG = [
+    {
+        version: 'v1.0.1',
+        changes: [
+            'Fixed death animation replaying when switching screens',
+            'Added replay button to play again with the same animals',
+            'Moved head and mouth above the body',
+            'Fixed wheel spin not being detected properly',
+            'Use weighted randomness for event decision, which means less chance of repeated events'
+        ]
+    },
+    {
+        version: 'v1.0.0',
+        changes: [
+            'Initial release',
+            'Create and customize animals with different traits',
+            'Wheel of fortune for random environmental events',
+            'Survival gameplay with hit points',
+            'Victory screen with confetti and fireworks',
+            'Sound effects and music toggle'
+        ]
+    }
+];
+
 // Image position offsets and rotations for fine-tuning specific images
 const IMAGE_OFFSETS = {
     // Mouths - move down to align properly
     'Dieet 1 planten 1 kleur.png': { y: 15 },
-    'Dieet 2 planten 2 kleur.png': { y: 15, rotation: -8 },
+    'Dieet 2 planten 2 kleur.png': { y: 0, rotation: -8 },
     'Dieet 3 vlees 1 kleur.png': { y: 15 },
     'Dieet 4 vlees 2 kleur.png': { y: 15 },
     // Flying legs 2 needs to be higher (it's lower than others)
@@ -18,6 +44,14 @@ const ANIMAL_SIZES = {
     lijf: { width: 160, height: 110 },
     ogen: { width: 110, height: 70 },
     voedsel: { width: 90, height: 60 }
+};
+
+// Y-axis offsets for animal parts (relative to center point)
+const ANIMAL_OFFSETS = {
+    voedsel: -170,  // Mouth - top
+    ogen: -110,     // Eyes/Head - below mouth
+    lijf: -30,      // Body - middle
+    poten: 10       // Legs - bottom (also uses LEGS_BASE_OFFSET)
 };
 
 // Game data configuration
@@ -61,7 +95,7 @@ const GAME_DATA = {
         },
         {
             name: 'Aardbeving',
-            description: 'Er ontstaat een grote kloof tussen de soort en hun voedsel',
+            description: 'Er ontstaat een grote kloof tussen de dieren en hun voedsel',
             affects: 'D',
             background: '#A0522D'
         },
@@ -144,8 +178,30 @@ class MainMenuScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.cameras.main;
+        const padding = 20;
 
         addSoundToggle(this);
+
+        // Version display (top left)
+        this.add.text(padding, padding, GAME_VERSION, {
+            fontSize: '18px',
+            color: '#888888',
+            fontFamily: 'Arial'
+        }).setOrigin(0, 0);
+
+        // Changelog button (top right)
+        const changelogButton = this.add.text(width - padding, padding, 'Changelog', {
+            fontSize: '18px',
+            color: '#888888',
+            fontFamily: 'Arial',
+            fontStyle: 'italic'
+        }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+
+        changelogButton.on('pointerover', () => changelogButton.setColor('#ffffff'));
+        changelogButton.on('pointerout', () => changelogButton.setColor('#888888'));
+        changelogButton.on('pointerdown', () => {
+            this.scene.start('ChangelogScene');
+        });
 
         this.add.text(width / 2, height / 3, 'EVOLUTIESPEL', {
             fontSize: '64px',
@@ -255,6 +311,71 @@ class CreditsScene extends Phaser.Scene {
     }
 }
 
+// Changelog Scene
+class ChangelogScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'ChangelogScene' });
+    }
+
+    create() {
+        const { width, height } = this.cameras.main;
+
+        addSoundToggle(this);
+
+        this.add.text(width / 2, 60, 'CHANGELOG', {
+            fontSize: '48px',
+            color: '#ffffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Display changelog entries
+        let yPos = 130;
+        CHANGELOG.forEach((entry) => {
+            // Version header
+            this.add.text(width / 2, yPos, entry.version, {
+                fontSize: '28px',
+                color: '#4CAF50',
+                fontFamily: 'Arial',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            yPos += 40;
+
+            // Changes list
+            entry.changes.forEach((change) => {
+                this.add.text(width / 2, yPos, '• ' + change, {
+                    fontSize: '20px',
+                    color: '#cccccc',
+                    fontFamily: 'Arial',
+                    wordWrap: { width: width - 100 }
+                }).setOrigin(0.5);
+                yPos += 30;
+            });
+
+            yPos += 20; // Extra space between versions
+        });
+
+        // Back button
+        const backButton = this.add.rectangle(width / 2, height - 80, 200, 50, 0x555555)
+            .setInteractive({ useHandCursor: true });
+
+        this.add.text(width / 2, height - 80, 'TERUG', {
+            fontSize: '24px',
+            color: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        backButton.on('pointerover', () => backButton.setFillStyle(0x777777));
+        backButton.on('pointerout', () => backButton.setFillStyle(0x555555));
+        backButton.on('pointerdown', () => {
+            this.scene.start('MainMenuScene');
+        });
+
+        // Handle resize
+        this.scale.on('resize', () => this.scene.restart());
+    }
+}
+
 // Animal Count Selection Scene
 class AnimalCountScene extends Phaser.Scene {
     constructor() {
@@ -298,6 +419,7 @@ class AnimalCountScene extends Phaser.Scene {
                 gameState.animalCount = count;
                 gameState.animals = [];
                 gameState.currentAnimalIndex = 0;
+                gameState.usedEnvironments = [];
 
                 for (let i = 0; i < count; i++) {
                     gameState.animals.push({
@@ -305,7 +427,8 @@ class AnimalCountScene extends Phaser.Scene {
                         name: `Dier ${i + 1}`,
                         traits: { ogen: null, poten: null, lijf: null, voedsel: null },
                         variants: { ogen: 0, poten: 0, lijf: 0, voedsel: 0 },
-                        hitPoints: 2
+                        hitPoints: 2,
+                        deathAnimationPlayed: false
                     });
                 }
 
@@ -501,7 +624,7 @@ class TraitSelectionScene extends Phaser.Scene {
                 const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
                 const potenImage = potenInfo.images[animal.variants.poten];
                 const potenOffset = (IMAGE_OFFSETS[potenImage]?.y || 0) + LEGS_BASE_OFFSET;
-                const poten = this.add.image(previewX, creatureY + 10 + potenOffset, potenImage);
+                const poten = this.add.image(previewX, creatureY + ANIMAL_OFFSETS.poten + potenOffset, potenImage);
                 poten.setDisplaySize(ANIMAL_SIZES.poten.width, ANIMAL_SIZES.poten.height);
             }
 
@@ -509,25 +632,26 @@ class TraitSelectionScene extends Phaser.Scene {
             if (animal.traits.lijf) {
                 const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
                 const lijfImage = lijfInfo.images[animal.variants.lijf];
-                const lijf = this.add.image(previewX, creatureY - 30, lijfImage);
+                const lijf = this.add.image(previewX, creatureY + ANIMAL_OFFSETS.lijf, lijfImage);
                 lijf.setDisplaySize(ANIMAL_SIZES.lijf.width, ANIMAL_SIZES.lijf.height);
             }
 
-            // Eyes/Head (if selected) - below body
+            // Eyes/Head (if selected) - above body
             if (animal.traits.ogen) {
                 const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
                 const ogenImage = ogenInfo.images[animal.variants.ogen];
-                const ogen = this.add.image(previewX, creatureY + 50, ogenImage);
+                const ogen = this.add.image(previewX, creatureY + ANIMAL_OFFSETS.ogen, ogenImage);
                 ogen.setDisplaySize(ANIMAL_SIZES.ogen.width, ANIMAL_SIZES.ogen.height);
+                ogen.setAngle(180);
             }
 
-            // Mouth (if selected) - below eyes
+            // Mouth (if selected) - on top of head
             if (animal.traits.voedsel) {
                 const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
                 const voedselImage = voedselInfo.images[animal.variants.voedsel];
                 const voedselOffset = IMAGE_OFFSETS[voedselImage]?.y || 0;
-                const voedselRotation = IMAGE_OFFSETS[voedselImage]?.rotation || 0;
-                const voedsel = this.add.image(previewX, creatureY + 90 + voedselOffset, voedselImage);
+                const voedselRotation = (IMAGE_OFFSETS[voedselImage]?.rotation || 0) + 180;
+                const voedsel = this.add.image(previewX, creatureY + ANIMAL_OFFSETS.voedsel + voedselOffset, voedselImage);
                 voedsel.setDisplaySize(ANIMAL_SIZES.voedsel.width, ANIMAL_SIZES.voedsel.height);
                 voedsel.setAngle(voedselRotation);
             }
@@ -619,33 +743,34 @@ class GamePlayScene extends Phaser.Scene {
 
             // Composite trait images into one unified animal
             // Layer order: poten (legs) at back, then lijf (body), ogen (eyes), voedsel (mouth)
-            const centerY = y - 80;
+            const centerY = y - 30;
 
             // Legs (attached to body)
             const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
             const potenImage = potenInfo.images[animal.variants.poten];
             const potenOffset = (IMAGE_OFFSETS[potenImage]?.y || 0) + LEGS_BASE_OFFSET;
-            const poten = this.add.image(x, centerY + 10 + potenOffset, potenImage);
+            const poten = this.add.image(x, centerY + ANIMAL_OFFSETS.poten + potenOffset, potenImage);
             poten.setDisplaySize(ANIMAL_SIZES.poten.width, ANIMAL_SIZES.poten.height);
 
             // Body (at top)
             const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
             const lijfImage = lijfInfo.images[animal.variants.lijf];
-            const lijf = this.add.image(x, centerY - 30, lijfImage);
+            const lijf = this.add.image(x, centerY + ANIMAL_OFFSETS.lijf, lijfImage);
             lijf.setDisplaySize(ANIMAL_SIZES.lijf.width, ANIMAL_SIZES.lijf.height);
 
-            // Eyes/Head (below body)
+            // Eyes/Head (above body)
             const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
             const ogenImage = ogenInfo.images[animal.variants.ogen];
-            const ogen = this.add.image(x, centerY + 50, ogenImage);
+            const ogen = this.add.image(x, centerY + ANIMAL_OFFSETS.ogen, ogenImage);
             ogen.setDisplaySize(ANIMAL_SIZES.ogen.width, ANIMAL_SIZES.ogen.height);
+            ogen.setAngle(180);
 
-            // Mouth (below eyes)
+            // Mouth (on top of head)
             const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
             const voedselImage = voedselInfo.images[animal.variants.voedsel];
             const voedselOffset = IMAGE_OFFSETS[voedselImage]?.y || 0;
-            const voedselRotation = IMAGE_OFFSETS[voedselImage]?.rotation || 0;
-            const voedsel = this.add.image(x, centerY + 90 + voedselOffset, voedselImage);
+            const voedselRotation = (IMAGE_OFFSETS[voedselImage]?.rotation || 0) + 180;
+            const voedsel = this.add.image(x, centerY + ANIMAL_OFFSETS.voedsel + voedselOffset, voedselImage);
             voedsel.setDisplaySize(ANIMAL_SIZES.voedsel.width, ANIMAL_SIZES.voedsel.height);
             voedsel.setAngle(voedselRotation);
 
@@ -739,11 +864,35 @@ class WheelScene extends Phaser.Scene {
         // Pointer (fixed position on the right, pointing left)
         const pointer = this.add.triangle(centerX + radius + 30, centerY, 0, 0, 40, -20, 40, 20, 0xFF0000);
 
-        // Spin the wheel
-        let currentAngle = 0;
-        const spinDuration = 3000;
+        // Weighted random selection - environments used before have lower weight
+        const weights = GAME_DATA.environments.map((env, index) => {
+            const timesUsed = gameState.usedEnvironments.filter(i => i === index).length;
+            // Weight decreases exponentially with each use: 1, 0.25, 0.0625, etc.
+            return Math.pow(0.25, timesUsed);
+        });
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+        let random = Math.random() * totalWeight;
+        let selectedIndex = 0;
+        for (let i = 0; i < weights.length; i++) {
+            random -= weights[i];
+            if (random <= 0) {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        // Track this environment as used
+        gameState.usedEnvironments.push(selectedIndex);
+
+        // Calculate the angle to land on the selected segment
+        // Segment i center is at angle: (i + 0.5) * anglePerSegment - π/2
+        // Pointer is at angle 0 (right side)
+        // For segment to align with pointer: rotation = π/2 - (i + 0.5) * anglePerSegment
         const spins = 5 + Math.random() * 3;
-        const finalAngle = spins * Math.PI * 2 + Math.random() * Math.PI * 2;
+        const finalAngle = spins * Math.PI * 2 + Math.PI / 2 - (selectedIndex + 0.5) * anglePerSegment;
+
+        // Spin the wheel
+        const spinDuration = 3000;
 
         // Play wheel sound with 10% frequency modulation (±165 cents)
         this.sound.play('wheel', { detune: Phaser.Math.Between(-165, 165) });
@@ -754,10 +903,6 @@ class WheelScene extends Phaser.Scene {
             duration: spinDuration,
             ease: 'Cubic.easeOut',
             onComplete: () => {
-                // Adjust for pointer on the right (add π/2 to account for 90 degree offset)
-                const adjustedAngle = finalAngle + Math.PI / 2;
-                const normalizedAngle = (adjustedAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-                const selectedIndex = Math.floor(normalizedAngle / anglePerSegment);
                 const selectedEnv = GAME_DATA.environments[selectedIndex];
 
                 gameState.currentEnvironment = selectedEnv;
@@ -795,16 +940,20 @@ class ResultScene extends Phaser.Scene {
         // Change background color based on environment
         this.cameras.main.setBackgroundColor(env.background);
 
+        // Use dark text for light backgrounds (like snowstorm)
+        const lightBackgrounds = ['#E0FFFF', '#FFD700'];
+        const textColor = lightBackgrounds.includes(env.background) ? '#333333' : '#ffffff';
+
         this.add.text(width / 2, 60, env.name.toUpperCase(), {
             fontSize: '48px',
-            color: '#ffffff',
+            color: textColor,
             fontFamily: 'Arial',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
         this.add.text(width / 2, 120, env.description, {
             fontSize: '24px',
-            color: '#ffffff',
+            color: textColor,
             fontFamily: 'Arial',
             wordWrap: { width: width - 100 }
         }).setOrigin(0.5);
@@ -829,7 +978,7 @@ class ResultScene extends Phaser.Scene {
             // Draw composite animal
             this.add.text(x, y - 240, animal.name, {
                 fontSize: '32px',
-                color: '#ffffff',
+                color: textColor,
                 fontFamily: 'Arial',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
@@ -839,36 +988,37 @@ class ResultScene extends Phaser.Scene {
 
             // Composite trait images into one unified animal
             // Layer order: poten (legs) at back, then lijf (body), ogen (eyes), voedsel (mouth)
-            const centerY = y - 70;
+            const centerY = y - 20;
 
             // Legs (attached to body)
             const potenInfo = GAME_DATA.traits.poten[animal.traits.poten];
             const potenImage = potenInfo.images[animal.variants.poten];
             const potenOffset = (IMAGE_OFFSETS[potenImage]?.y || 0) + LEGS_BASE_OFFSET;
-            const poten = this.add.image(0, centerY + 10 + potenOffset, potenImage);
+            const poten = this.add.image(0, centerY + ANIMAL_OFFSETS.poten + potenOffset, potenImage);
             poten.setDisplaySize(ANIMAL_SIZES.poten.width, ANIMAL_SIZES.poten.height);
             animalContainer.add(poten);
 
             // Body (at top)
             const lijfInfo = GAME_DATA.traits.lijf[animal.traits.lijf];
             const lijfImage = lijfInfo.images[animal.variants.lijf];
-            const lijf = this.add.image(0, centerY - 30, lijfImage);
+            const lijf = this.add.image(0, centerY + ANIMAL_OFFSETS.lijf, lijfImage);
             lijf.setDisplaySize(ANIMAL_SIZES.lijf.width, ANIMAL_SIZES.lijf.height);
             animalContainer.add(lijf);
 
-            // Eyes/Head (below body)
+            // Eyes/Head (above body)
             const ogenInfo = GAME_DATA.traits.ogen[animal.traits.ogen];
             const ogenImage = ogenInfo.images[animal.variants.ogen];
-            const ogen = this.add.image(0, centerY + 50, ogenImage);
+            const ogen = this.add.image(0, centerY + ANIMAL_OFFSETS.ogen, ogenImage);
             ogen.setDisplaySize(ANIMAL_SIZES.ogen.width, ANIMAL_SIZES.ogen.height);
+            ogen.setAngle(180);
             animalContainer.add(ogen);
 
-            // Mouth (below eyes)
+            // Mouth (on top of head)
             const voedselInfo = GAME_DATA.traits.voedsel[animal.traits.voedsel];
             const voedselImage = voedselInfo.images[animal.variants.voedsel];
             const voedselOffset = IMAGE_OFFSETS[voedselImage]?.y || 0;
-            const voedselRotation = IMAGE_OFFSETS[voedselImage]?.rotation || 0;
-            const voedsel = this.add.image(0, centerY + 90 + voedselOffset, voedselImage);
+            const voedselRotation = (IMAGE_OFFSETS[voedselImage]?.rotation || 0) + 180;
+            const voedsel = this.add.image(0, centerY + ANIMAL_OFFSETS.voedsel + voedselOffset, voedselImage);
             voedsel.setDisplaySize(ANIMAL_SIZES.voedsel.width, ANIMAL_SIZES.voedsel.height);
             voedsel.setAngle(voedselRotation);
             animalContainer.add(voedsel);
@@ -912,7 +1062,7 @@ class ResultScene extends Phaser.Scene {
             // Show new hit points
             this.add.text(x, y + 120, `❤️ ${animal.hitPoints}`, {
                 fontSize: '42px',
-                color: '#ffffff',
+                color: textColor,
                 fontFamily: 'Arial'
             }).setOrigin(0.5);
 
@@ -921,12 +1071,19 @@ class ResultScene extends Phaser.Scene {
                 const animalParts = [poten, lijf, ogen, voedsel];
                 animalParts.forEach(part => part.setTint(0x666666));
 
-                this.tweens.add({
-                    targets: animalContainer,
-                    angle: 180,
-                    duration: 800,
-                    ease: 'Back.easeIn'
-                });
+                // Only play the death animation if it hasn't been played yet
+                if (!animal.deathAnimationPlayed) {
+                    this.tweens.add({
+                        targets: animalContainer,
+                        angle: 180,
+                        duration: 800,
+                        ease: 'Back.easeIn'
+                    });
+                    animal.deathAnimationPlayed = true;
+                } else {
+                    // Already dead - just show flipped immediately
+                    animalContainer.setAngle(180);
+                }
 
                 this.add.text(x, y + 180, '💀 DOOD', {
                     fontSize: '36px',
@@ -984,15 +1141,40 @@ class GameOverScene extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        const restartButton = this.add.rectangle(width / 2, height / 2 + 50, 250, 60, 0x4CAF50)
+        // Replay with same animals button
+        const replayButton = this.add.rectangle(width / 2, height / 2 + 50, 300, 60, 0xFF9800)
             .setInteractive({ useHandCursor: true });
 
-        this.add.text(width / 2, height / 2 + 50, 'OPNIEUW SPELEN', {
+        this.add.text(width / 2, height / 2 + 50, 'OPNIEUW (ZELFDE DIEREN)', {
+            fontSize: '24px',
+            color: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        replayButton.on('pointerover', () => replayButton.setFillStyle(0xFFA726));
+        replayButton.on('pointerout', () => replayButton.setFillStyle(0xFF9800));
+        replayButton.on('pointerdown', () => {
+            // Reset all animals
+            gameState.animals.forEach(animal => {
+                animal.hitPoints = 2;
+                animal.deathAnimationPlayed = false;
+            });
+            gameState.usedEnvironments = [];
+            this.scene.start('GamePlayScene');
+        });
+
+        // New game button
+        const restartButton = this.add.rectangle(width / 2, height / 2 + 130, 250, 60, 0x4CAF50)
+            .setInteractive({ useHandCursor: true });
+
+        this.add.text(width / 2, height / 2 + 130, 'NIEUW SPEL', {
             fontSize: '28px',
             color: '#ffffff',
             fontFamily: 'Arial'
         }).setOrigin(0.5);
 
+        restartButton.on('pointerover', () => restartButton.setFillStyle(0x66BB6A));
+        restartButton.on('pointerout', () => restartButton.setFillStyle(0x4CAF50));
         restartButton.on('pointerdown', () => {
             this.scene.start('MainMenuScene');
         });
@@ -1042,46 +1224,71 @@ class YouWinScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Draw the winning animal
-        const animalY = height / 2 + 30;
+        const animalY = height / 2 + 80;
 
         // Legs
         const potenInfo = GAME_DATA.traits.poten[winner.traits.poten];
         const potenImage = potenInfo.images[winner.variants.poten];
         const potenOffset = (IMAGE_OFFSETS[potenImage]?.y || 0) + LEGS_BASE_OFFSET;
-        const poten = this.add.image(width / 2, animalY + 10 + potenOffset, potenImage);
+        const poten = this.add.image(width / 2, animalY + ANIMAL_OFFSETS.poten + potenOffset, potenImage);
         poten.setDisplaySize(ANIMAL_SIZES.poten.width, ANIMAL_SIZES.poten.height);
 
         // Body
         const lijfInfo = GAME_DATA.traits.lijf[winner.traits.lijf];
         const lijfImage = lijfInfo.images[winner.variants.lijf];
-        const lijf = this.add.image(width / 2, animalY - 30, lijfImage);
+        const lijf = this.add.image(width / 2, animalY + ANIMAL_OFFSETS.lijf, lijfImage);
         lijf.setDisplaySize(ANIMAL_SIZES.lijf.width, ANIMAL_SIZES.lijf.height);
 
-        // Eyes
+        // Eyes (above body)
         const ogenInfo = GAME_DATA.traits.ogen[winner.traits.ogen];
         const ogenImage = ogenInfo.images[winner.variants.ogen];
-        const ogen = this.add.image(width / 2, animalY + 50, ogenImage);
+        const ogen = this.add.image(width / 2, animalY + ANIMAL_OFFSETS.ogen, ogenImage);
         ogen.setDisplaySize(ANIMAL_SIZES.ogen.width, ANIMAL_SIZES.ogen.height);
+        ogen.setAngle(180);
 
-        // Mouth
+        // Mouth (on top of head)
         const voedselInfo = GAME_DATA.traits.voedsel[winner.traits.voedsel];
         const voedselImage = voedselInfo.images[winner.variants.voedsel];
         const voedselOffset = IMAGE_OFFSETS[voedselImage]?.y || 0;
-        const voedselRotation = IMAGE_OFFSETS[voedselImage]?.rotation || 0;
-        const voedsel = this.add.image(width / 2, animalY + 90 + voedselOffset, voedselImage);
+        const voedselRotation = (IMAGE_OFFSETS[voedselImage]?.rotation || 0) + 180;
+        const voedsel = this.add.image(width / 2, animalY + ANIMAL_OFFSETS.voedsel + voedselOffset, voedselImage);
         voedsel.setDisplaySize(ANIMAL_SIZES.voedsel.width, ANIMAL_SIZES.voedsel.height);
         voedsel.setAngle(voedselRotation);
 
-        // Restart button
-        const restartButton = this.add.rectangle(width / 2, height - 80, 250, 60, 0x4CAF50)
+        // Replay with same animals button
+        const replayButton = this.add.rectangle(width / 2, height - 150, 300, 50, 0xFF9800)
             .setInteractive({ useHandCursor: true });
 
-        this.add.text(width / 2, height - 80, 'OPNIEUW SPELEN', {
-            fontSize: '28px',
+        this.add.text(width / 2, height - 150, 'OPNIEUW (ZELFDE DIEREN)', {
+            fontSize: '22px',
             color: '#ffffff',
             fontFamily: 'Arial'
         }).setOrigin(0.5);
 
+        replayButton.on('pointerover', () => replayButton.setFillStyle(0xFFA726));
+        replayButton.on('pointerout', () => replayButton.setFillStyle(0xFF9800));
+        replayButton.on('pointerdown', () => {
+            // Reset all animals
+            gameState.animals.forEach(animal => {
+                animal.hitPoints = 2;
+                animal.deathAnimationPlayed = false;
+            });
+            gameState.usedEnvironments = [];
+            this.scene.start('GamePlayScene');
+        });
+
+        // New game button
+        const restartButton = this.add.rectangle(width / 2, height - 80, 250, 50, 0x4CAF50)
+            .setInteractive({ useHandCursor: true });
+
+        this.add.text(width / 2, height - 80, 'NIEUW SPEL', {
+            fontSize: '24px',
+            color: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        restartButton.on('pointerover', () => restartButton.setFillStyle(0x66BB6A));
+        restartButton.on('pointerout', () => restartButton.setFillStyle(0x4CAF50));
         restartButton.on('pointerdown', () => {
             this.scene.start('MainMenuScene');
         });
@@ -1156,7 +1363,7 @@ const config = {
     width: window.innerWidth,
     height: window.innerHeight,
     backgroundColor: '#2d2d2d',
-    scene: [MainMenuScene, CreditsScene, AnimalCountScene, TraitSelectionScene, GamePlayScene, WheelScene, ResultScene, GameOverScene, YouWinScene],
+    scene: [MainMenuScene, CreditsScene, ChangelogScene, AnimalCountScene, TraitSelectionScene, GamePlayScene, WheelScene, ResultScene, GameOverScene, YouWinScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
