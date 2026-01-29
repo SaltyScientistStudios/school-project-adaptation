@@ -872,24 +872,20 @@ class WheelScene extends Phaser.Scene {
         });
         const totalWeight = weights.reduce((sum, w) => sum + w, 0);
         let random = Math.random() * totalWeight;
-        let selectedIndex = 0;
+        let targetIndex = 0;
         for (let i = 0; i < weights.length; i++) {
             random -= weights[i];
             if (random <= 0) {
-                selectedIndex = i;
+                targetIndex = i;
                 break;
             }
         }
 
-        // Track this environment as used
-        gameState.usedEnvironments.push(selectedIndex);
-
-        // Calculate the angle to land on the selected segment
-        // Segment i center is at angle: (i + 0.5) * anglePerSegment - π/2
-        // Pointer is at angle 0 (right side)
-        // For segment to align with pointer: rotation = π/2 - (i + 0.5) * anglePerSegment
+        // Spin the wheel to land on the target segment
         const spins = 5 + Math.random() * 3;
-        const finalAngle = spins * Math.PI * 2 + Math.PI / 2 - (selectedIndex + 0.5) * anglePerSegment;
+        // Add small random offset within the segment so it doesn't always land exactly in center
+        const segmentOffset = (Math.random() - 0.5) * anglePerSegment * 0.6;
+        const finalAngle = spins * Math.PI * 2 + Math.random() * Math.PI * 2;
 
         // Spin the wheel
         const spinDuration = 3000;
@@ -903,7 +899,23 @@ class WheelScene extends Phaser.Scene {
             duration: spinDuration,
             ease: 'Cubic.easeOut',
             onComplete: () => {
+                // Determine which segment the pointer is actually pointing at
+                const wheelAngleRad = wheelContainer.angle * Math.PI / 180;
+                // The pointer is at angle 0 (right side)
+                // We need to find which segment is at angle 0 after rotation
+                // Segment i spans from (i * anglePerSegment - π/2) to ((i+1) * anglePerSegment - π/2)
+                // After rotation, it spans from (i * anglePerSegment - π/2 + wheelAngle) to ((i+1) * anglePerSegment - π/2 + wheelAngle)
+                // We want the segment where 0 falls within this range
+                // Rearranging: segment at pointer has index where:
+                // (pointerAngle - wheelAngle + π/2) mod 2π / anglePerSegment
+                const pointerAngle = 0;
+                const adjustedAngle = (pointerAngle - wheelAngleRad + Math.PI / 2 + Math.PI * 4) % (Math.PI * 2);
+                const selectedIndex = Math.floor(adjustedAngle / anglePerSegment) % segmentCount;
+
                 const selectedEnv = GAME_DATA.environments[selectedIndex];
+
+                // Track this environment as used
+                gameState.usedEnvironments.push(selectedIndex);
 
                 gameState.currentEnvironment = selectedEnv;
 
